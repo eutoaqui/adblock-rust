@@ -202,6 +202,8 @@ pub enum CbRuleCreationFailure {
     ScriptletInjectionsNotSupported,
     /// Valid content blocking rules can only include ASCII characters.
     RuleContainsNonASCII,
+    /// Content blocking rules cannot support procedural cosmetic filter operators.
+    ProceduralCosmeticFiltersUnsupported,
 }
 
 impl TryFrom<ParsedFilter> for CbRuleEquivalent {
@@ -560,7 +562,7 @@ impl TryFrom<CosmeticFilter> for CbRule {
             return Err(CbRuleCreationFailure::ScriptletInjectionsNotSupported);
         }
 
-        if let Some(raw_line) = v.raw_line {
+        if let Some(raw_line) = &v.raw_line {
             let mut hostnames_vec = vec![];
             let mut not_hostnames_vec = vec![];
 
@@ -602,10 +604,16 @@ impl TryFrom<CosmeticFilter> for CbRule {
                 (not_hostnames_vec, hostnames_vec)
             };
 
+            let selector = if let Some(selector) = v.plain_css_selector() {
+                selector.to_string()
+            } else {
+                return Err(CbRuleCreationFailure::ProceduralCosmeticFiltersUnsupported);
+            };
+
             let rule = Self {
                 action: CbAction {
                     typ: CbType::CssDisplayNone,
-                    selector: Some(v.selector),
+                    selector: Some(selector),
                 },
                 trigger: CbTrigger {
                     url_filter: ".*".to_string(),
